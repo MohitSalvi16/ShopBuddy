@@ -8,6 +8,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
 import { DealCard } from './DealPanels';
+import { RatePurchase } from './ReviewPanels';
 
 const SPEC_LABEL: Record<string, string> = {
   battery_hours: 'Battery (h)', battery_days: 'Battery (days)', anc: 'ANC', driver_mm: 'Driver (mm)', bluetooth: 'Bluetooth',
@@ -261,6 +262,9 @@ export function OrderSuccess() {
               <Row label="Total paid" value={inr(order.total)} className="font-semibold" />
               <Row label="Status" value={order.status} />
               <Row label="Arriving by" value={order.estimated_delivery} />
+            </div>
+            <div className="mt-3 space-y-1.5">
+              {order.items.map((i) => <RatePurchase key={i.product_id} productId={i.product_id} name={i.name} />)}
             </div>
             <p className="mt-3 text-[11px] text-slate-500">Simulated payment · demo order stored in SQLite</p>
             <Button className="mt-4 w-full" onClick={() => set({ order: null, results: null, comparison: null })}>Continue shopping</Button>

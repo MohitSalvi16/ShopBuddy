@@ -11,6 +11,7 @@ export type UiEvent =
   | { type: 'comparison'; items: unknown[] }
   | { type: 'deal'; title: string; result: unknown; items: unknown[] }
   | { type: 'critique'; critique: unknown }
+  | { type: 'reviews'; insights: unknown; rated?: { rating: number; new_average: number } }
   | { type: 'language'; lang: string; ttsLocale: string | null }
   | { type: 'focus'; product: unknown }
   | { type: 'cart'; cart: unknown }

@@ -246,3 +246,60 @@ test('language preference: English choice overrides Hinglish input; Hinglish cho
   const auto = await runTurn(c, [{ role: 'user', content: 'Headphones under 5000 for office calls' }]);
   assert.equal(auto.lang, 'en');
 });
+
+test('reviews are consistent with catalog attributes: weak mic → complaint, great mic → praise', async () => {
+  const { getReviewInsights } = await import('../src/reviews.js');
+  const boult = getReviewInsights('HP-208', 'calls'); // mic 4.5/10, rating 3.8
+  assert.ok(boult.complaints.some((c) => c.aspect === 'mic' && c.severity === 'major'), JSON.stringify(boult.complaints));
+  assert.notEqual(boult.verdict, 'mostly_positive');
+  const jabra = getReviewInsights('HP-209', 'calls'); // mic 9.5/10, rating 4.5
+  assert.ok(jabra.praise.some((p) => p.aspect === 'mic'));
+  assert.ok(jabra.complaints.length > 0, 'even the best product has an honest (minor) complaint');
+  assert.match(jabra.disclaimer, /simulated/i);
+});
+
+test('rating: only verified buyers, updates the average, re-rating replaces', async () => {
+  const id = sid();
+  const before = shop.getProduct('AC-503');
+  const notBought = executeTool(id, 'rate_product', { product_id: 'AC-503', rating: 5 });
+  assert.equal(!notBought.ok && notBought.error.code, 'NOT_PURCHASED');
+  shop.addToCart(id, 'AC-503', 1);
+  shop.createOrder(id, false); shop.createOrder(id, true);
+  const r1 = executeTool(id, 'rate_product', { product_id: 'AC-503', rating: 1, comment: 'Stopped charging after a week' });
+  assert.ok(r1.ok);
+  assert.equal(shop.getProduct('AC-503').reviews, before.reviews + 1);
+  const { db } = await import('../src/db.js');
+  const rawAfter = Number((db.prepare('SELECT rating FROM products WHERE id = ?').get('AC-503') as any).rating);
+  assert.ok(rawAfter < before.rating, `stored average must drop after a 1-star rating (${rawAfter})`);
+  const ins = executeTool(id, 'get_review_insights', { product_id: 'AC-503' });
+  assert.ok(ins.ok && ins.data.complaints.some((c: any) => /Stopped charging/.test(c.quote)), 'low verified rating surfaces as a complaint');
+  const r2 = executeTool(id, 'rate_product', { product_id: 'AC-503', rating: 5 });
+  assert.ok(r2.ok && r2.data.updated === true);
+  assert.equal(shop.getProduct('AC-503').reviews, before.reviews + 1, 're-rating does not add a second review');
+  const bad = executeTool(id, 'rate_product', { product_id: 'AC-503', rating: 7 });
+  assert.equal(!bad.ok && bad.error.code, 'INVALID_INPUT');
+});
+
+test('rule engine: asks about a product by name/ordinal → rating + praise + complaint; rates after purchase', async () => {
+  const id = sid();
+  const say = convo(id);
+  const r1 = await say('How is the Jabra Evolve2?');
+  assert.match(r1, /Evolve2 30 SE is rated 4\.\d★/);
+  assert.match(r1, /Buyers like/);
+  assert.match(r1, /complaint/i);
+  await say('Headphones under 5000 for office calls');
+  const r2 = await say('Teesra wala kaisa hai?'); // third card = cheapest Boult
+  assert.match(r2, /Q Over-Ear ka rating/);
+  assert.match(r2, /Shikayat: microphone on calls/);
+  await say('Pehla wala cart mein add karo');
+  await say('Yes, confirm.');
+  const r3 = await say('Isko 4 star dunga');
+  assert.match(r3, /4 star|4 stars/);
+  assert.match(r3, /average/);
+});
+
+test('deal cards carry review highlights', () => {
+  const r = executeTool(sid(), 'find_best_deal', { category: 'headphones', budget: 5000, use_case: 'calls' });
+  assert.ok(r.ok);
+  for (const d of r.data.recommendations) assert.ok(d.review && 'top_praise' in d.review && 'top_complaint' in d.review);
+});

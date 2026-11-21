@@ -13,12 +13,12 @@ type Row = Record<string, any>;
 function toProduct(r: Row): Product {
   return {
     id: r.id, name: r.name, brand: r.brand, category: r.category,
-    price: Number(r.price), mrp: Number(r.mrp), rating: Number(r.rating), reviews: Number(r.reviews),
+    price: Number(r.price), mrp: Number(r.mrp), rating: Math.round(Number(r.rating) * 100) / 100, reviews: Number(r.reviews),
     stock: Number(r.stock), highlights: JSON.parse(r.highlights), specs: JSON.parse(r.specs), image: r.image,
   };
 }
 
-export type ErrorCode = 'NOT_FOUND' | 'OUT_OF_STOCK' | 'INVALID_QUANTITY' | 'COUPON_INVALID' | 'CART_EMPTY' | 'CART_CHANGED' | 'BUSINESS_RULE';
+export type ErrorCode = 'NOT_FOUND' | 'OUT_OF_STOCK' | 'INVALID_QUANTITY' | 'COUPON_INVALID' | 'CART_EMPTY' | 'CART_CHANGED' | 'NOT_PURCHASED' | 'BUSINESS_RULE';
 /** Indian-format rupees for user-facing text: 1169 -> "₹1,169". */
 export const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -310,4 +310,20 @@ export function getOrderStatus(orderId: string) {
 
 export function latestOrders(sessionId: string, limit = 5) {
   return (db.prepare('SELECT id FROM orders WHERE session_id = ? ORDER BY created_at DESC LIMIT ?').all(sessionId, limit) as Row[]).map((r) => getOrderStatus(r.id));
+}
+
+/** Find a product the customer named ("how is the Jabra?", "H390 kaisa hai"). Returns the best match or undefined. */
+export function findProductMention(text: string): string | undefined {
+  const t = ` ${text.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g, ' ')} `;
+  let best: { id: string; score: number } | undefined;
+  for (const r of db.prepare('SELECT id, name, brand FROM products').all() as { id: string; name: string; brand: string }[]) {
+    const name = r.name.toLowerCase();
+    let score = t.includes(` ${name.replace(/[^a-z0-9]+/g, ' ').trim()} `) ? 10 : 0;
+    for (const tok of name.split(/[^a-z0-9]+/).filter((x) => x.length >= 3 && !['pro', 'max', 'lite', 'buds', 'watch', 'over', 'ear', 'usb', 'headset', 'wireless'].includes(x))) {
+      if (t.includes(` ${tok} `)) score += /\d/.test(tok) ? 4 : 2;
+    }
+    if (t.includes(` ${r.brand.toLowerCase().split(' ')[0]} `)) score += 1;
+    if (score >= 2 && (!best || score > best.score)) best = { id: r.id, score };
+  }
+  return best?.id;
 }

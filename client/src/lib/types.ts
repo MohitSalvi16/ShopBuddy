@@ -10,6 +10,7 @@ export interface Deal {
   best_coupon: { code: string; discount: number } | null; discount: number; final_price: number;
   scores: { requirement: number; quality: number; value: number; preference: number; total: number };
   advantages: string[]; disadvantages: string[]; reasoning: string; tags: string[];
+  review?: { verdict: string; top_praise: string | null; top_complaint: string | null; top_complaint_severity: string | null };
 }
 export interface Critique {
   product_id?: string; name?: string; final_price?: number; score?: number;
@@ -45,7 +46,7 @@ export interface Caps {
   languages?: { understanding: string[]; stt: { lite: string[]; agora: string }; tts: { default: string; hindi: string } | null; note: string };
 }
 
-export interface Msg { id: string; role: 'user' | 'assistant'; text: string; source: 'voice' | 'text' }
+export interface Msg { id: string; role: 'user' | 'assistant'; text: string; source: 'voice' | 'text'; at: number }
 export interface ToolEvent { id: string; name: string; args: unknown; ok: boolean; error?: string; at: number }
 
 export type UiEvent =
@@ -56,6 +57,7 @@ export type UiEvent =
   | { type: 'comparison'; items: PricedProduct[] }
   | { type: 'deal'; title: string; result: DealResult; items: Product[] }
   | { type: 'critique'; critique: Critique }
+  | { type: 'reviews'; insights: ReviewInsights; rated?: { rating: number; new_average: number } }
   | { type: 'focus'; product: Product }
   | { type: 'cart'; cart: Cart }
   | { type: 'checkout'; summary: Cart }
@@ -66,3 +68,12 @@ export type VoiceState = 'off' | 'connecting' | 'listening' | 'thinking' | 'spea
 export type VoiceMode = 'agora' | 'lite';
 
 export type LangPref = 'auto' | 'en' | 'hi' | 'hinglish';
+
+export interface ReviewInsights {
+  product_id: string; name: string; rating: number; review_count: number;
+  verdict: 'mostly_positive' | 'mixed' | 'mostly_negative';
+  praise: { aspect: string; label: string; quote: string }[];
+  complaints: { aspect: string; label: string; severity: 'minor' | 'major'; quote: string }[];
+  customer_ratings: { rating: number; text: string; author: string; at: string }[];
+  summary: string; disclaimer: string;
+}

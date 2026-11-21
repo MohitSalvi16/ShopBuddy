@@ -66,6 +66,7 @@ export interface ScoredDeal {
   scores: { requirement: number; quality: number; value: number; preference: number; total: number };
   advantages: string[]; disadvantages: string[]; reasoning: string;
   tags: string[];
+  review?: { verdict: string; top_praise: string | null; top_complaint: string | null; top_complaint_severity: string | null };
 }
 
 function inferUseCase(goal: ShoppingGoal): UseCase {

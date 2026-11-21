@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Lightbulb, Check, AlertTriangle, Trophy, BadgePercent, Wallet, Scale, ShoppingCart, Sparkles, Target } from 'lucide-react';
+import { MessageSquareQuote, Lightbulb, Check, AlertTriangle, Trophy, BadgePercent, Wallet, Scale, ShoppingCart, Sparkles, Target } from 'lucide-react';
 import { useStore } from '../store';
 import { api, inr } from '../lib/api';
 import type { Deal } from '../lib/types';
@@ -75,6 +75,14 @@ export function DealCard({ d, index }: { d: Deal; index: number }) {
           {d.advantages.slice(0, 3).map((a) => <li key={a} className="flex gap-1.5 text-slate-300"><Check className="mt-0.5 size-3 shrink-0 text-emerald-400" />{a}</li>)}
           {d.disadvantages.slice(0, 2).map((a) => <li key={a} className="flex gap-1.5 text-amber-200/90"><AlertTriangle className="mt-0.5 size-3 shrink-0 text-amber-400" />{a}</li>)}
         </ul>
+        {d.review && (d.review.top_praise || d.review.top_complaint) && (
+          <p className="rounded-lg bg-white/[0.04] px-2 py-1 text-[11px] leading-relaxed text-slate-400" data-testid="review-line">
+            <span className="text-slate-500">Buyers: </span>
+            {d.review.top_praise && <span className="text-emerald-300">like the {d.review.top_praise}</span>}
+            {d.review.top_praise && d.review.top_complaint && <span> · </span>}
+            {d.review.top_complaint && <span className={d.review.top_complaint_severity === 'major' ? 'text-rose-300' : 'text-amber-200'}>complain about {d.review.top_complaint}</span>}
+          </p>
+        )}
         <details className="group text-xs text-slate-400">
           <summary className="cursor-pointer select-none text-[11px] text-vaani-cyan/80 hover:text-vaani-cyan">Why this score?</summary>
           <div className="mt-2 space-y-1">
@@ -85,9 +93,14 @@ export function DealCard({ d, index }: { d: Deal; index: number }) {
             <p className="pt-1 leading-relaxed">{d.reasoning}</p>
           </div>
         </details>
-        <Button size="sm" variant={best ? 'default' : 'secondary'} className="mt-auto w-full" onClick={() => api.addToCart(d.product_id).catch(onErr)}>
-          <ShoppingCart /> {inCart ? 'Add one more' : 'Add to cart'}
-        </Button>
+        <div className="mt-auto flex gap-2">
+          <Button size="sm" variant="outline" className="shrink-0" aria-label={`Reviews for ${d.name}`} onClick={() => api.showReviews(d.product_id).catch(onErr)}>
+            <MessageSquareQuote /> Reviews
+          </Button>
+          <Button size="sm" variant={best ? 'default' : 'secondary'} className="w-full" onClick={() => api.addToCart(d.product_id).catch(onErr)}>
+            <ShoppingCart /> {inCart ? 'Add one more' : 'Add to cart'}
+          </Button>
+        </div>
       </div>
     </motion.div>
   );

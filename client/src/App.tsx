@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Compass, ShoppingCart } from 'lucide-react';
+import { Compass, MessagesSquare, ShoppingCart } from 'lucide-react';
+import { ConversationDrawer } from './components/ConversationDrawer';
 import { useStore } from './store';
 import { api, sessionId } from './lib/api';
 import type { UiEvent } from './lib/types';
@@ -8,6 +9,7 @@ import { Onboarding } from './components/Onboarding';
 import { VoicePanel, type VoiceControls } from './components/VoicePanel';
 import { Results, Comparison, ToolLog, OrderSuccess, CartDrawer } from './components/ShopPanels';
 import { DevilsAdvocate, BudgetCard } from './components/DealPanels';
+import { ReviewsPanel } from './components/ReviewPanels';
 import { Badge } from './components/ui/badge';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BRAND } from './brand';
@@ -15,7 +17,7 @@ import type { AgoraVoice } from './voice/agoraVoice';
 import { LiteVoice, liteSupported } from './voice/liteVoice';
 
 export default function App() {
-  const { onboarded, caps, set, handle, mode, cart } = useStore();
+  const { onboarded, caps, set, handle, mode, cart, messages } = useStore();
   const agoraRef = useRef<AgoraVoice | null>(null);
   // Agora SDK is ~1.5MB: load it only when Agora Live voice is used.
   const getAgora = async () => (agoraRef.current ??= new (await import('./voice/agoraVoice')).AgoraVoice());
@@ -81,7 +83,12 @@ export default function App() {
                 <Badge variant={connected ? 'success' : 'danger'}>{connected ? 'Live sync' : 'Offline'}</Badge>
                 <Badge variant={mode === 'agora' ? 'cyan' : 'default'}>{mode === 'agora' ? 'Agora Live voice' : 'Lite voice'}</Badge>
                 <Badge variant={caps?.murf ? 'success' : 'warn'}>{caps?.murf ? 'Murf Falcon' : 'No TTS key'}</Badge>
-                <button onClick={() => set({ cartOpen: true })} aria-label="Open cart"
+                <button onClick={() => set({ chatOpen: true, cartOpen: false })} aria-label="Open conversation"
+                  className="relative flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm hover:bg-white/10">
+                  <MessagesSquare className="size-4" /> <span className="hidden sm:inline">Conversation</span>
+                  {messages.length > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-vaani-purple px-1 text-[11px] font-bold text-white">{messages.length}</span>}
+                </button>
+                <button onClick={() => set({ cartOpen: true, chatOpen: false })} aria-label="Open cart"
                   className="relative flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm hover:bg-white/10">
                   <ShoppingCart className="size-4" /> Cart
                   {(cart?.item_count ?? 0) > 0 && (
@@ -95,6 +102,7 @@ export default function App() {
               <div className="min-w-0 lg:sticky lg:top-4 lg:h-[calc(100vh-6rem)]"><ErrorBoundary name="Voice panel"><VoicePanel controls={controls} /></ErrorBoundary></div>
               <div className="min-w-0 space-y-4"><ErrorBoundary name="Shopping panel">
                 <DevilsAdvocate />
+                <ReviewsPanel />
                 <Results />
                 <Comparison />
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 [&>*]:min-w-0">
@@ -104,6 +112,7 @@ export default function App() {
               </ErrorBoundary></div>
             </main>
             <CartDrawer />
+            <ConversationDrawer />
             <OrderSuccess />
           </motion.div>
         )}

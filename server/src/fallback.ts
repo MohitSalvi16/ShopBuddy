@@ -4,7 +4,8 @@
  * tools as the LLM. Replies are built only from tool results — nothing is hardcoded as a success.
  */
 import { executeTool, type ToolResult } from './tools.js';
-import { detectCategory, sessionState, getCart, type UseCase } from './shop.js';
+import { detectCategory, sessionState, getCart, findProductMention, type UseCase } from './shop.js';
+import { purchasedProductIds } from './reviews.js';
 import { detectLanguage, normalizeForRules } from './lang.js';
 import { config } from './config.js';
 
@@ -106,6 +107,35 @@ export function ruleBasedReply(sessionId: string, history: { role: string; conte
     const r = executeTool(sessionId, 'get_order_status', {});
     if (!ok(r)) return say('Abhi tak koi order nahi hai.', 'You have no orders yet.');
     return say(`Order ${r.data.order_id} ${r.data.status} hai, ${r.data.estimated_delivery} tak pahunchega.`, `Order ${r.data.order_id} is ${r.data.status}, arriving by ${r.data.estimated_delivery}.`);
+  }
+
+  // ---------------------------------------------------------- 2b. rate a purchased product ("H390 ko 4 star", "rate it 5")
+  const starMatch = t.match(/\b([1-5])\s*(?:star|stars|\/\s*5)\b/) ?? (/\b(rate|rating|dunga|dungi|dena)\b/.test(t) ? t.match(/\b(?:rate|rating)\b\D{0,15}\b([1-5])\b|\b([1-5])\b\D{0,12}\b(?:rating|dunga|dungi)\b/) : null);
+  const stars = starMatch ? Number(starMatch[1] ?? starMatch[2]) : undefined;
+  if (stars) {
+    const bought = purchasedProductIds(sessionId);
+    const named = raw.toUpperCase().match(/\b([A-Z]{2}-\d{3})\b/)?.[1] ?? findProductMention(t);
+    const pid = named ?? (bought.length === 1 ? bought[0] : ss.focusId && bought.includes(ss.focusId) ? ss.focusId : bought[0]);
+    if (!pid) return say('Rating dene ke liye pehle kuch kharidna hoga — sirf verified buyers rate kar sakte hain.', 'You can rate a product after buying it — ratings are for verified buyers only.');
+    const r = executeTool(sessionId, 'rate_product', { product_id: pid, rating: stars });
+    if (!ok(r)) return say(`Rating save nahi hui: ${errMsg(r)}`, `Couldn't save the rating: ${errMsg(r)}`);
+    return say(`Shukriya! ${r.data.name} ko aapne ${stars} star diye. Naya average rating ${r.data.new_average}★ hai.`, `Thanks! You rated ${r.data.name} ${stars} stars. Its new average is ${r.data.new_average}★.`);
+  }
+
+  // ---------------------------------------------------------- 2c. reviews ("how is the Jabra", "second wala kaisa hai", "reviews?")
+  if (/\breviews?\b|\brating kya\b|kaisa hai|kaisi hai|kaise hai|log kya|what do (?:people|buyers|customers) say|how is (?:the|it)|how good|is it good|worth it|achha hai kya|accha hai kya|feedback/.test(t)) {
+    const n = parseOrdinal(t, ss.shown.length);
+    const pid = raw.toUpperCase().match(/\b([A-Z]{2}-\d{3})\b/)?.[1] ?? findProductMention(t) ?? (n ? at(n) : ss.focusId ?? at(1));
+    if (!pid) return say('Kis product ke reviews chahiye? Naam ya "pehla/dusra" boliye.', 'Which product? Say its name, or "the first/second one".');
+    const r = executeTool(sessionId, 'get_review_insights', { product_id: pid });
+    if (!ok(r)) return errMsg(r);
+    const d = r.data;
+    const good = d.praise[0]?.label, bad = d.complaints[0];
+    const verdictHi = d.verdict === 'mostly_positive' ? 'Overall buyers khush hain' : d.verdict === 'mostly_negative' ? 'Overall reviews kamzor hain, main behtar option dikha sakta hoon' : 'Reviews mixed hain';
+    const verdictEn = d.verdict === 'mostly_positive' ? 'Overall, buyers are happy' : d.verdict === 'mostly_negative' ? 'Overall the reviews are weak; I can show a better-rated option' : 'Reviews are mixed';
+    return say(
+      `${d.name} ka rating ${d.rating}★ hai. ${good ? `Log iski ${good} pasand karte hain. ` : ''}${bad ? `Shikayat: ${bad.label}${bad.severity === 'major' ? ', yeh dhyan dene wali baat hai' : ', par minor hai'}. ` : 'Koi badi shikayat nahi. '}${verdictHi}.`,
+      `${d.name} is rated ${d.rating}★. ${good ? `Buyers like its ${good}. ` : ''}${bad ? `Main complaint: ${bad.label}${bad.severity === 'major' ? ', worth noting' : ', but it is minor'}. ` : 'No common complaints. '}${verdictEn}.`);
   }
 
   // ---------------------------------------------------------- 3. goal / budget memory

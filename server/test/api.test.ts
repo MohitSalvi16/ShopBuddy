@@ -38,7 +38,7 @@ test('health, config and tool catalog', async () => {
   assert.ok(cfg.missingForAgoraVoice.length > 0);
   assert.match(cfg.greeting, /ShopBuddy/);
   const tools = await (await get('/api/tools')).json();
-  assert.equal(tools.length, 13);
+  assert.equal(tools.length, 15);
   for (const t of tools) assert.ok(t.input_schema?.type === 'object' && t.output_schema, t.name);
 });
 
@@ -203,4 +203,20 @@ test('language choice is accepted, validated and persisted per session', async (
   // the choice sticks for later turns that don't resend it (e.g. Agora voice turns)
   const r2 = await (await fetch(base + '/api/chat', json({ sessionId: s, history: [{ role: 'user', content: 'koi discount hai?' }] }))).json();
   assert.equal(r2.lang, 'en');
+});
+
+test('reviews + rating endpoints', async () => {
+  const s = sid();
+  const rev = await (await get('/api/products/HP-209/reviews')).json();
+  assert.equal(rev.ok, true);
+  assert.ok(rev.data.praise.length && rev.data.complaints.length);
+  const forbidden = await fetch(base + '/api/products/HP-206/rating', json({ rating: 5 }, s));
+  assert.equal(forbidden.status, 403);
+  await fetch(base + '/api/cart/items', json({ productId: 'HP-206' }, s));
+  await fetch(base + '/api/orders', json({ confirmation: false }, s));
+  await fetch(base + '/api/orders', json({ confirmation: true }, s));
+  const okRate = await (await fetch(base + '/api/products/HP-206/rating', json({ rating: 4, comment: 'Clear mic' }, s))).json();
+  assert.equal(okRate.ok, true);
+  assert.equal(okRate.data.your_rating, 4);
+  assert.equal((await fetch(base + '/api/products/HP-206/rating', json({ rating: 0 }, s))).status, 400);
 });

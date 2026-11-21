@@ -23,6 +23,14 @@ async function openApp(page: Page) {
 async function say(page: Page, text: string) {
   const replies = page.getByTestId('msg-assistant');
   const before = await replies.count();
+  // A drawer (cart / conversation) may have opened itself; close it like a user would before typing.
+  for (const name of ['Close cart', 'Close conversation']) {
+    const btn = page.getByRole('button', { name });
+    if (await btn.isVisible().catch(() => false)) {
+      await btn.click({ timeout: 2000 }).catch(() => { /* already closing (exit animation) */ });
+      await expect(btn).toBeHidden();
+    }
+  }
   await page.getByPlaceholder(/Type in English, Hindi or Hinglish/).fill(text);
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByTestId('msg-user').last()).toContainText(text.slice(0, 20));
@@ -209,5 +217,61 @@ test('language selector: English forces English replies, choice survives reload,
   await page.getByRole('button', { name: /Start shopping/i }).click();
   await expect(page.getByRole('radiogroup', { name: 'Reply language' }).getByRole('radio', { name: 'हिंदी' })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByText(/हिंदी में जवाब/)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('conversation side panel: full history, timestamps, download, Escape closes', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await say(page, 'headphones under 5000 for office calls');
+  await say(page, 'Compare the first two.');
+  const btn = page.getByRole('button', { name: 'Open conversation' });
+  await expect(btn).toContainText('4'); // 2 user + 2 assistant lines
+  await btn.click();
+  const panel = page.getByRole('dialog', { name: 'Conversation' });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId('conv-user')).toHaveCount(2);
+  await expect(panel.getByTestId('conv-assistant')).toHaveCount(2);
+  await expect(panel.getByText('headphones under 5000 for office calls')).toBeVisible();
+  await expect(panel.getByText(/\d{1,2}:\d{2}/).first()).toBeVisible();
+  const [download] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'Download conversation' }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^shopbuddy-conversation-.*\.txt$/);
+  const txt = fs.readFileSync(await download.path(), 'utf8');
+  expect(txt).toContain('You (text): headphones under 5000 for office calls');
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: `${SHOTS}/06-conversation-panel.png` });
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('reviews: ask about a product → good AND bad; card Reviews button; rate after purchase', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await say(page, 'headphones under 5000 for office calls');
+  await expect(page.getByTestId('review-line').first()).toBeVisible(); // praise/complaint line on deal cards
+  const r = await say(page, 'Teesra wala kaisa hai?');
+  expect(r).toMatch(/rating 3\.8★/);
+  expect(r).toMatch(/Shikayat: microphone on calls/);
+  const panel = page.getByRole('region', { name: 'What buyers say' });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText('Mostly negative')).toBeVisible();
+  await expect(panel.getByText('Buyers like')).toBeVisible();
+  await expect(panel.getByText('Common complaints')).toBeVisible();
+  await expect(panel.getByText('major').first()).toBeVisible();
+  await page.screenshot({ path: `${SHOTS}/07-reviews.png`, fullPage: true });
+  // Reviews button on the best-pick card switches the panel to that product
+  await page.getByRole('button', { name: /Reviews for H390 USB Headset/ }).click();
+  await expect(panel.getByText('Logitech H390 USB Headset')).toBeVisible();
+  await expect(panel.getByText('Mostly positive')).toBeVisible();
+  // buy it, then rate from the order confirmation
+  await say(page, 'Pehla wala cart mein add karo');
+  await say(page, 'Yes, confirm.');
+  await expect(page.getByText('Demo order confirmed!')).toBeVisible();
+  await page.getByRole('button', { name: 'Rate 5 stars' }).click();
+  await expect(page.getByText('Thanks! You rated it 5★', { exact: true })).toBeVisible(); // order card
+  await expect(page.getByText(/new average \d\.\d{2}★/)).toBeVisible(); // reviews panel updated live
+  await page.screenshot({ path: `${SHOTS}/08-rate.png` });
+  await page.getByRole('button', { name: 'Continue shopping' }).click();
   expect(errors).toEqual([]);
 });

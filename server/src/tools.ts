@@ -2,6 +2,7 @@ import { z } from 'zod';
 import * as shop from './shop.js';
 import { findBestDeal, critiqueChoice } from './recommend.js';
 import { emit } from './events.js';
+import { getReviewInsights, rateProduct, reviewHighlights, purchasedProductIds } from './reviews.js';
 
 /**
  * Agent tools. Each tool has a zod INPUT schema (validated, and converted to JSON Schema for the LLM),
@@ -58,6 +59,16 @@ const TOOLS = {
     description: "Shopping Devil's Advocate: evaluates a product the customer wants (e.g. the cheapest) against in-budget alternatives using real catalog attributes. Returns verdict (good_choice | acceptable | reconsider), concerns and a better alternative with the extra cost.",
     input: z.object({ product_id: pid, use_case: useCase.optional(), budget: z.coerce.number().positive().optional() }),
     output: z.object({ verdict: z.string(), concerns: z.array(z.string()), better_alternative: z.object({}).passthrough().nullable(), message: z.string() }).passthrough(),
+  },
+  get_review_insights: {
+    description: "Customer reviews & rating for one product: overall rating, verdict, what buyers praise and what they complain about (with quotes), plus verified-buyer ratings. Use whenever the customer asks about a specific product (how is it, kaisa hai, reviews, is it good, worth it). Always tell BOTH the main praise and the main complaint.",
+    input: z.object({ product_id: pid }),
+    output: z.object({ product_id: z.string(), rating: z.number(), verdict: z.string(), praise: z.array(z.object({}).passthrough()), complaints: z.array(z.object({}).passthrough()) }).passthrough(),
+  },
+  rate_product: {
+    description: 'Save the customer\'s 1-5 star rating (optional comment) for a product they BOUGHT in this session; updates the product\'s average rating. Only call with a rating the customer explicitly gave.',
+    input: z.object({ product_id: pid, rating: z.coerce.number().int().min(1).max(5), comment: z.string().max(500).optional() }),
+    output: z.object({ product_id: z.string(), your_rating: z.number(), new_average: z.number(), review_count: z.number() }).passthrough(),
   },
   get_product_details: {
     description: 'Full catalog specs for one product.',
@@ -189,9 +200,21 @@ function run(sessionId: string, name: ToolName, a: any): unknown {
       }
       const goal = { ...st.goal, ...Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined)) };
       const r = findBestDeal(sessionId, { ...goal, max_price_below: maxBelow, limit: a.limit });
+      for (const d of r.recommendations) d.review = reviewHighlights(d.product_id, r.goal.use_case);
       const label = `${r.goal.category === 'any' ? 'products' : r.goal.category} for ${r.goal.use_case}${r.goal.budget ? ` · budget ₹${Number(r.goal.budget).toLocaleString('en-IN')}` : ''}${maxBelow ? ` · cheaper than ₹${maxBelow.toLocaleString('en-IN')}` : ''}`;
       emit(sessionId, { type: 'deal', title: label, result: r, items: r.recommendations.map((d) => shop.getProduct(d.product_id)) });
       return r;
+    }
+    case 'get_review_insights': {
+      const r = getReviewInsights(a.product_id, st.goal.use_case ?? 'general');
+      st.focusId = r.product_id;
+      emit(sessionId, { type: 'reviews', insights: r });
+      return r;
+    }
+    case 'rate_product': {
+      const r = rateProduct(sessionId, a.product_id, a.rating, a.comment);
+      emit(sessionId, { type: 'reviews', insights: r.insights, rated: { rating: r.your_rating, new_average: r.new_average } });
+      return { ...r, insights: undefined };
     }
     case 'critique_choice': {
       const r = critiqueChoice(sessionId, a.product_id, { use_case: a.use_case, budget: a.budget });
@@ -284,5 +307,6 @@ export function contextSnapshot(sessionId: string) {
     `Cart: ${cart.items.length ? cart.items.map((i) => `${i.quantity}x ${i.name} (${i.product_id})`).join(', ') + `; subtotal ₹${cart.subtotal}, discount ₹${cart.discount}${cart.coupon ? ` (${cart.coupon.code})` : ''}, total ₹${cart.total}` : 'empty'}`,
     `Checkout summary shown and awaiting confirmation: ${st.pendingOrder ? `YES (total ₹${cart.total})` : 'no'}`,
     st.lastOrder ? `Last order placed: ${st.lastOrder.orderId}` : '',
+    purchasedProductIds(sessionId).length ? `Products the customer bought (can be rated): ${purchasedProductIds(sessionId).join(', ')}` : '',
   ].filter(Boolean).join('\n');
 }

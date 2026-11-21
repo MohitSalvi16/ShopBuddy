@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LangPref, Caps, Cart, Critique, DealResult, Msg, Order, PricedProduct, Product, ToolEvent, UiEvent, VoiceMode, VoiceState } from './lib/types';
+import type { ReviewInsights, LangPref, Caps, Cart, Critique, DealResult, Msg, Order, PricedProduct, Product, ToolEvent, UiEvent, VoiceMode, VoiceState } from './lib/types';
 
 interface State {
   caps: Caps | null;
@@ -15,6 +15,9 @@ interface State {
   comparison: PricedProduct[] | null;
   critique: Critique | null;
   cartOpen: boolean;
+  chatOpen: boolean;
+  reviews: ReviewInsights | null;
+  rated: { rating: number; new_average: number } | null;
   ttsNote: string | null;
   language: LangPref;
   setLanguage: (l: LangPref) => void;
@@ -49,6 +52,9 @@ export const useStore = create<State>((set, get) => ({
   comparison: null,
   critique: null,
   cartOpen: false,
+  chatOpen: false,
+  reviews: null,
+  rated: null,
   ttsNote: null,
   language: initialLanguage(),
   setLanguage: (l) => { try { localStorage.setItem(LANG_KEY, l); } catch { /* ignore */ } set({ language: l }); },
@@ -64,7 +70,7 @@ export const useStore = create<State>((set, get) => ({
         const last = get().messages.at(-1);
         // Agora may retry a turn; avoid showing the exact same line twice in a row.
         if (last && last.role === e.role && last.text === e.text) return;
-        set({ messages: [...get().messages, { id: uid(), role: e.role, text: e.text, source: e.source }] });
+        set({ messages: [...get().messages, { id: uid(), role: e.role, text: e.text, source: e.source, at: Date.now() }] });
         break;
       }
       case 'status': set({ thinking: e.state === 'thinking' }); break;
@@ -72,10 +78,11 @@ export const useStore = create<State>((set, get) => ({
       case 'products': set({ results: { title: e.title, items: e.items }, comparison: null, focus: null, critique: null }); break;
       case 'deal': set({ results: { title: e.title, items: e.items, deals: e.result }, comparison: null, focus: null, critique: e.result.devils_advocate?.verdict === 'reconsider' ? e.result.devils_advocate : null }); break;
       case 'critique': set({ critique: e.critique }); break;
+      case 'reviews': set({ reviews: e.insights, rated: e.rated ?? null }); break;
       case 'comparison': set({ comparison: e.items }); break;
       case 'focus': set({ focus: e.product }); break;
       case 'cart': { const co = get().checkout; set({ cart: e.cart, checkout: co && e.cart.items.length && co.total === e.cart.total ? co : null }); break; }
-      case 'checkout': set({ checkout: e.summary, cartOpen: true }); break;
+      case 'checkout': set({ checkout: e.summary, cartOpen: true, chatOpen: false }); break;
       case 'order': set({ order: e.order, checkout: null }); break;
       case 'agent': break;
     }

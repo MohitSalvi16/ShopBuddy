@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { z } from 'zod';
 import { config, capabilities } from './config.js';
 import { seedCatalog, resetStock } from './db.js';
+import { seedReviews } from './reviews.js';
 import * as shop from './shop.js';
 import { executeTool, TOOL_CATALOG, type ToolResult } from './tools.js';
 import { findBestDeal } from './recommend.js';
@@ -16,6 +17,7 @@ import { streamTts } from './murf.js';
 import { productSvg } from './images.js';
 
 seedCatalog();
+seedReviews();
 
 export const app = express();
 app.use(cors());
@@ -30,7 +32,7 @@ class HttpError extends Error { constructor(public status: number, msg: string) 
 const wrap = (fn: (req: Request, res: Response) => unknown) => (req: Request, res: Response, next: NextFunction) =>
   Promise.resolve(fn(req, res)).catch(next);
 /** Tool results carry {error} on business failures — surface as 422 for REST callers. */
-const toolResponse = (res: Response, r: ToolResult) => (r.ok ? res.json(r) : res.status(r.error.code === 'INVALID_INPUT' ? 400 : r.error.code === 'NOT_FOUND' ? 404 : 422).json(r));
+const toolResponse = (res: Response, r: ToolResult) => (r.ok ? res.json(r) : res.status(r.error.code === 'INVALID_INPUT' ? 400 : r.error.code === 'NOT_FOUND' ? 404 : r.error.code === 'NOT_PURCHASED' ? 403 : 422).json(r));
 
 // ------------------------------------------------------------------ meta
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -71,6 +73,8 @@ app.get('/api/products', wrap((req, res) => {
   res.json(shop.searchProducts(q.q, { category: q.category, maxPrice: q.maxPrice, minPrice: q.minPrice, sortBy: q.sortBy, limit: q.limit ?? 6, inStockOnly: false }));
 }));
 app.get('/api/products/:id', wrap((req, res) => res.json(shop.getProduct(String(req.params.id)))));
+app.get('/api/products/:id/reviews', wrap((req, res) => toolResponse(res, executeTool(String(req.query.session ?? 'anonymous-reviews'), 'get_review_insights', { product_id: req.params.id }))));
+app.post('/api/products/:id/rating', wrap((req, res) => toolResponse(res, executeTool(sessionOf(req), 'rate_product', { product_id: req.params.id, rating: req.body.rating, comment: req.body.comment }))));
 app.get('/api/products/:id/inventory', wrap((req, res) => res.json(shop.checkInventory(String(req.params.id)))));
 app.get('/api/cart', wrap((req, res) => res.json(shop.getCart(sessionOf(req)))));
 app.post('/api/cart/items', wrap((req, res) => toolResponse(res, executeTool(sessionOf(req), 'add_to_cart', { product_id: req.body.productId, quantity: req.body.quantity ?? 1 }))));
