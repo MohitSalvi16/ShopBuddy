@@ -42,10 +42,24 @@ export function useDisplayState(): VoiceState {
   return voice;
 }
 
+/** True on short viewports (e.g. 1280x720 laptops) so the transcript keeps enough room. */
+function useShortScreen() {
+  const q = '(max-height: 860px) and (min-width: 1024px)';
+  const [short, setShort] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setShort(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return short;
+}
+
 export function VoicePanel({ controls }: { controls: VoiceControls }) {
   const { messages, mode, micLevel, agentLevel, error, caps, set, thinking, ttsNote, language, setLanguage } = useStore();
   // Agora fixes ASR language + TTS voice when the agent joins, so the choice is locked during a live Agora call.
   const state = useDisplayState();
+  const short = useShortScreen();
   const langLocked = mode === 'agora' && state !== 'off';
   const [text, setText] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
@@ -56,7 +70,7 @@ export function VoicePanel({ controls }: { controls: VoiceControls }) {
   const submit = (t: string) => { const v = t.trim(); if (!v) return; controls.sendText(v); setText(''); };
 
   return (
-    <Card className="flex h-full min-h-[640px] flex-col overflow-hidden">
+    <Card className="flex h-full min-h-[600px] flex-col overflow-hidden lg:min-h-0">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-5 py-3">
         <div className="flex items-center gap-2">
           <Radio className="size-4 text-vaani-cyan" />
@@ -74,8 +88,8 @@ export function VoicePanel({ controls }: { controls: VoiceControls }) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-3 px-5 pt-6 pb-4">
-        <VoiceOrb state={state} level={state === 'speaking' ? agentLevel : micLevel} onClick={controls.toggle} size={200} />
+      <div className={cn('flex flex-col items-center px-5', short ? 'gap-2 pt-3 pb-3' : 'gap-3 pt-6 pb-4')}>
+        <VoiceOrb state={state} level={state === 'speaking' ? agentLevel : micLevel} onClick={controls.toggle} size={short ? 120 : 200} />
         <Waveform level={state === 'speaking' ? agentLevel : state === 'listening' ? micLevel : 0} color={state === 'speaking' ? 'purple' : 'cyan'} />
         <div className="flex flex-wrap items-center justify-center gap-2">
           {state === 'off'

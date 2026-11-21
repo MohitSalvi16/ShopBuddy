@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "screenshots": "node scripts/capture-screenshots.mjs"
   },
   "dependencies": {
     "agora-rtc-sdk-ng": "^4.24.10",

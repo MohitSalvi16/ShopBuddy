@@ -1,0 +1,72 @@
+SHOPBUDDY - HACKATHON SUBMISSION FORM ANSWERS
+=============================================
+
+
+TITLE OF YOUR BUILD
+-------------------
+ShopBuddy - Your Friendly AI Voice Shopping Buddy
+
+
+DESCRIPTION
+-----------
+ShopBuddy is a voice-first AI shopping assistant that sits on the customer's side, not the seller's. Speak naturally in English, Hindi or Hinglish ("Bhai, Rs 5,000 ke andar office calls ke liye best headphones chahiye") and ShopBuddy understands your goal, searches the catalog and finds the right deal - not just the cheapest one.
+
+Built with Agora Conversational AI + Agora RTC for real-time voice, Murf Falcon for natural Indian voices, and Gemini with real tool calling over 15 backend tools. A transparent score (fit 40%, quality 25%, value 20%, preferences 15%) ranks products with only backend-verified coupons applied.
+
+ShopBuddy gives friendly, honest tips ("great price, but the mic is weak for calls - for Rs 896 more this one suits you better"), shares both the good and the bad from customer reviews, compares products side by side, adds to cart and applies coupons by voice, and checks out only after your explicit "yes". After purchase you can rate the product, which updates its rating for future shoppers.
+
+Extras: language selector (Auto / English / Hindi / Hinglish), conversation history panel, mobile-ready UI, safe two-step checkout with no duplicate orders, and fallbacks for every service. Tested with 36 server tests, 12 browser end-to-end tests and live integration checks. Demo store: catalog, reviews and payments are simulated.
+
+
+IMAGE GALLERY (upload from docs\screenshots\ - all 2560x1440, i.e. 1280x720 @2x)
+---------------------------------------------------------------------------
+1. 02-best-deals-thumbnail.png  - Deal cards + friendly tip  (use as THUMBNAIL - upload first)
+2. 03-reviews-good-and-bad.png  - "What buyers say": good AND bad reviews
+3. 04-comparison.png            - Side-by-side comparison with verified prices
+4. 05-cart-confirmation.png     - Cart + "awaiting your confirmation"
+5. 06-order-confirmed-rate.png  - Order confirmed + rate your purchase
+6. 07-conversation-panel.png    - Conversation side panel
+7. 01-onboarding.png            - Onboarding / landing
+8. 08-mobile.png                - Mobile view
+
+
+LINKS
+-----
+Link to Open Source Code:
+https://github.com/MohitSalvi16/ShopBuddy
+
+Link to live project:
+(Leave blank for now - the app runs locally. Add a hosted URL here if deployed.)
+
+
+VIDEO DEMO (OPTIONAL)
+---------------------
+Upload a 1-2 minute demo to YouTube (unlisted is fine), then paste:
+
+<iframe src="https://www.youtube.com/embed/YOUR_VIDEO_ID" width="320" height="200" frameborder="0" allowfullscreen></iframe>
+
+Suggested demo script:
+1. "Bhai, Rs 5,000 ke andar office calls ke liye best headphones chahiye."
+2. "Teesra wala kaisa hai?"
+3. "Second wala cart mein add kar do aur coupon apply karo."
+4. "Yes, confirm."
+5. Rate the product 5 stars, then open the Conversation panel.
+
+
+TEAMMATES
+---------
+(Add your team members' names here)
+
+
+TAGS (type each and press Enter)
+--------------------------------
+Agora
+Murf AI
+Voice AI
+Conversational AI
+Gemini
+AI Agent
+E-commerce
+Hinglish
+React
+Node.js
