@@ -1,0 +1,14 @@
+node_modules/
+dist/
+server/data/
+.env
+*.log
+e2e-report/
+e2e-shots/
+test-results/
+.env.*
+!.env.example
+.claude/
+*.db
+*.db-wal
+*.db-shm
